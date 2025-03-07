@@ -311,6 +311,9 @@ function love.draw()
     
     if AdjustingColor then
         suit.draw();
+        love.graphics.setColor(currentColor.r, currentColor.g, currentColor.b, 1)
+        love.graphics.circle("fill", 110, 210, 100, 40)
+        love.graphics.setColor(1,1,1,1)
     end
 end
 
