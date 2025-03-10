@@ -1,4 +1,11 @@
 suit = require 'vendors/suit'
+require 'utilities'
+
+WIDTH = 80
+HEIGHT = 50
+--! MUST BE INT, PREFERABLE DIVISIBLE BY 2
+SCALING_FACTOR = 10
+CanvasData = PixelMap.NewMap(WIDTH,HEIGHT)
 
 --! TOOLS
 Tools = {
@@ -11,195 +18,86 @@ Tools = {
 
 CurrentTool = Tools.PENCIL
 
---!fonts
-
-
 local pencilArea = 1
 local eraserArea = 1
-local pixelArray = {
-    x,
-    y,
-    r,
-    g,
-    b
-}
+
 local pixelScale = 10
-local showFinalGraphic = false
 local screenshotCanvas
 local currentColor = {r = 1,g = 1,b = 1,a = 1}
+
 local sliderR = {value = 1, min = 0.0, max = 1.0}
 local sliderG = {value = 1, min = 0.0, max = 1.0}
 local sliderB = {value = 1, min = 0.0, max = 1.0}
+
 local labelR = ""
 local labelG = ""
 local labelB = ""
 
+local showFinalGraphic = false
 local AdjustingColor = false
-local mousePos = {}
-
 local started = false
 
-function pixelArray:addPixel(xpos, ypos, color)
-    print("modified pixel at ".. xpos .. ", ".. ypos.. ", ".. color.r .. ", ".. color.g .. ", ".. color.b)
-    self[#self+1] = {
-        x = xpos,
-        y = ypos,
-        r = color.r,
-        g = color.g,
-        b = color.b
-    }
-end
+local mousePos = {}
 
-function pixelArray:copyPixel(xpos,ypos)
-    pixel = {
-        x = xpos,
-        y = ypos,
-        r = pixelArray:getPixelAt(x,y).r,
-        g = pixelArray:getPixelAt(x,y).g,
-        b = pixelArray:getPixelAt(x,y).b
-    }
-    return pixel
-end
 
-function pixelArray:hasPixel(xpos, ypos)
-    local out = 0;
-    for i = 1, #self do
-        if(self[i].x == xpos and self[i].y == ypos)then
-            out = i;
-        end
-    end
-    return out
-end
 
-function pixelArray:removePixel()
-    self[#self] = nil
-end
 
-function pixelArray:removePixelAt(xpos, ypos)
-    index = pixelArray:getIndexAt(xpos, ypos)
 
-    if(not (index == 0)) then
-        for i = index, #self do
-            if(i == #self) then
-                print("DELETED PIXEL AT " .. "(" .. self[i].x .. ", " .. self[i].y.. ")")
-                self[i] = nil
-            else
-                self[i] = self[i+1]
-            end
-        end
-    end 
-end
-
-function pixelArray:changeColor(index, rval,gval,bval)
-    pixelArray[index].r = rval;
-    pixelArray[index].g = gval;
-    pixelArray[index].b = bval;
-end
-
-function pixelArray:getIndexAt(xpos, ypos)
-    index = 0
-    for i = 1, #self do
-        if(self[i].x == xpos and self[i].y == ypos) then
-            index = i
-            break
-        end
-    end
-
-    if index == 0 then
-        print("PIXEL POSITION NOT VALIDP")
-    end
-
-    return index
-end
-
-function pixelArray:getPixelAt(x,y)
-    return pixelArray[pixelArray:getIndexAt(x,y)]
-end
-
-function pixelArray:matchColor(index, otherIndex)
-    if(self[index].r ~= self[otherIndex].r) then
-        return false
-    end
-    if(self[index].g ~= self[otherIndex].g) then
-        return false
-    end
-    if(self[index].b ~= self[otherIndex].b) then
-        return false
-    end
-    return true
-end
-
-function pickColor(xpos, ypos)
-    i = pixelArray:getIndexAt(xpos, ypos)
-
-    currentColor.r = pixelArray[i].r
-    currentColor.g = pixelArray[i].g
-    currentColor.b = pixelArray[i].b
+function pickColor(x, y)
+    currentColor = CanvasData:pickColor(x,y)
 end
 
 function drawPixel(x, y, color)
-    if(pixelArray:hasPixel(x,y) > 0)then
-        pixelArray:removePixelAt(x,y)
+    if(matchColor(CanvasData[x][y], color)) then
+        print("same color at: " .. x .. ", " .. y.. ", " .. color.r.. ", " .. color.g.. ", " .. color.b.. ", " .. color.a)
+       return 
     end
-    pixelArray:addPixel(x,y,color)
+    CanvasData:addPixel(x,y,color)
 end
 
 function erasePixel(x,y)
-    if(pixelArray:hasPixel(x,y) > 0) then
-        pixelArray:removePixelAt(x,y)
-    end
+    drawPixel(x,y, Color.defaultValue)
 end
 
 function floodFill(x,y)
     -- TODO implement this
     print("TO BE IMPLEMENTED")
-    startingPixel = pixelArray:getIndexAt(x,y)
-
-    print(x,y)  
-    print(startingPixel)
-    print(pixelArray:getIndexAt(x+1, y))
-
-    if(pixelArray:matchColor(startingPixel, pixelArray:getIndexAt(x+1,y))) then
-        drawPixel(x + 1, y, {0,1,0,1}) -- this is debug
-    end
-
-    if(pixelArray:matchColor(startingPixel, pixelArray:getIndexAt(x-1,y))) then
-        drawPixel(x - 1, y, {0,1,0,1})
-    end
-
-    if(pixelArray:matchColor(startingPixel, pixelArray:getIndexAt(x,y+1))) then
-        drawPixel(x, y-1, {0,1,0,1})
-    end
-
-    if(pixelArray:matchColor(startingPixel, pixelArray:getIndexAt(x,y-1))) then
-        drawPixel(x, y+1, {0,1,0,1})
-    end
 
 end
 
-function love.load()
-    love.filesystem.setIdentity("screenshots", false)
-    --! setting windows and canvas.
-    love.window.setMode(800, 800)
-    canvasTransform = love.math.newTransform()
-    canvasTransform:scale(pixelScale,pixelScale);
-    canvas = love.graphics.newCanvas(100, 100)
-    canvas:setFilter("nearest", "nearest", 1)
-    finalCanvasTransform = love.math.newTransform()
-    finalCanvasTransform:scale(2,2)
-    finalCanvas = love.graphics.newCanvas(400,400)
-    screenshotCanvas = love.graphics.newCanvas(800,800) 
-    love.graphics.setDefaultFilter("nearest", "nearest")
 
+--!-------------------------------------------------------------------
+--!                      LOAD METHOD
+--!-------------------------------------------------------------------
+
+function love.load()
+    --! Importan Variables
+    love.window.setMode(WIDTH*SCALING_FACTOR, HEIGHT*SCALING_FACTOR)
+    love.graphics.setDefaultFilter("nearest", "nearest")
+    love.filesystem.setIdentity("screenshots", false)
     
+
+    --! Setting Canvas
+    canvasTransform = love.math.newTransform()
+    canvasTransform:scale(SCALING_FACTOR,SCALING_FACTOR)
+    canvas = love.graphics.newCanvas(WIDTH, HEIGHT)
     
+    finalCanvas = love.graphics.newCanvas(WIDTH*SCALING_FACTOR,HEIGHT*SCALING_FACTOR)
+
+    screenshotCanvas = love.graphics.newCanvas(WIDTH*SCALING_FACTOR,HEIGHT*SCALING_FACTOR) 
+
+    --! Shaders
     local fragdir = love.filesystem.read('shader.frag')
     shader = love.graphics.newShader(fragdir)
     
     --send data to GPU
-    shader:send('inputSize', {love.graphics.getWidth(), love.graphics.getHeight()})
-    shader:send('textureSize', {love.graphics.getWidth(), love.graphics.getHeight()})
+    shader:send('inputSize', {WIDTH*SCALING_FACTOR, HEIGHT*SCALING_FACTOR})
+    shader:send('textureSize', {WIDTH*SCALING_FACTOR, HEIGHT*SCALING_FACTOR})
 end
+
+--!-------------------------------------------------------------------
+--!                      UPDATE LOOP
+--!-------------------------------------------------------------------
 
 function love.update(dt)
 
@@ -227,8 +125,8 @@ function love.update(dt)
 
     --! Getting mouse pos
     mousePos.x, mousePos.y = love.mouse.getPosition()
-    mpx = math.floor(mousePos.x/(pixelScale * 2))
-    mpy = math.floor(mousePos.y/(pixelScale * 2))
+    mpx = math.floor(mousePos.x/(SCALING_FACTOR) )
+    mpy = math.floor(mousePos.y/(SCALING_FACTOR))
 
 
     --! Manual Color Picker
@@ -255,12 +153,13 @@ function love.update(dt)
         --! picking tool
         if(love.mouse.isDown(1)) then
             if(CurrentTool == Tools.PENCIL) then
-               drawPixel(mpx,mpy, currentColor) 
+                -- CanvasData:setPixel(mpx,mpy, currentColor)
+               drawPixel(mpx,mpy, currentColor)
             elseif (CurrentTool == Tools.ERASER) then
                 erasePixel(mpx,mpy)
             elseif (CurrentTool == Tools.BUCKET) then
                 floodFill(mpx,mpy)
-            elseif (CurrentTool == Tools.COLOR_PICKER) then
+            elseif (CurrentTool == Tools_PICKER) then
                 pickColor(mpx,mpy)
             else 
                 print("NO TOOL SELECTED!!!")
@@ -269,9 +168,7 @@ function love.update(dt)
     
         --!Erase shortcut
         if(love.mouse.isDown(2)) then
-            if(pixelArray:hasPixel(mpx,mpy)) then
-                pixelArray:removePixelAt(mpx,mpy)
-            end
+            erasePixel(mpx,mpy)
         end
             
         --!Colorpicker shortcut
@@ -279,19 +176,20 @@ function love.update(dt)
             pickColor(mpx, mpy)
         end
 
-        --! Printing the whole pixel array.
-        -- print("\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n")
-        -- for i = 1, #pixelArray do
-        --     print("p" .. i .. " = " .. pixelArray[i].x ..", ".. pixelArray[i].y..", ".. pixelArray[i].r..", ".. pixelArray[i].g..", ".. pixelArray[i].b)
-        -- end
-
         --! Writing to the canvas.
         canvas:renderTo(function()
             love.graphics.clear()
-            for i = 1, #pixelArray do
-                love.graphics.setColor(pixelArray[i].r, pixelArray[i].g, pixelArray[i].b, 1)
-                love.graphics.rectangle("fill",pixelArray[i].x, pixelArray[i].y,1, 1)
+
+            for x = 1, WIDTH do
+                for y = 1, HEIGHT do
+                    CanvasData:drawPixelRectangle(x,y)  
+                end
             end
+
+            -- for i = 1, #pixelArray do
+            --     love.graphics.setColor(pixelArray[i].r, pixelArray[i].g, pixelArray[i].b, 1)
+            --     love.graphics.rectangle("fill",pixelArray[i].x, pixelArray[i].y,1, 1)
+            -- end
             --for pixel in pixelArray do
             --    love.graphics.rectangle("fill",pixel.x, pixel.y,1, 1)
             --end
@@ -300,8 +198,14 @@ function love.update(dt)
     end 
 end
 
+--!-------------------------------------------------------------------
+--!                      DRAW LOOP
+--!-------------------------------------------------------------------
+
 function love.draw()
     
+
+    --! Starting Screen
     if(started == false) then
         love.graphics.print("Welcome to Lua Paint!", 40, 40,0, 4)
         love.graphics.print("this is my first project in Lua and Love2D,\nhere are some shortcuts you might wanna know.", 40, 120,0,1.5)
@@ -311,6 +215,7 @@ function love.draw()
         return
     end
 
+    --! First Render pass
     love.graphics.setCanvas(finalCanvas)
     love.graphics.clear()--clear display
     love.graphics.setBackgroundColor(.01,.01,.15,1)
@@ -324,24 +229,31 @@ function love.draw()
     end
     
     -- if not showFinalGraphic then
-    for i = 0, 800/pixelScale do
-        love.graphics.line(i * (pixelScale), 0, i * (pixelScale), 800)
-        love.graphics.line(0,i * (pixelScale), 800, i * (pixelScale))
+    for x = 1, WIDTH do
+        love.graphics.line(x * (SCALING_FACTOR), 0, x * (SCALING_FACTOR), HEIGHT*SCALING_FACTOR)
+    end
+
+    for y = 1, HEIGHT do
+        love.graphics.line(0,y * (SCALING_FACTOR), WIDTH*SCALING_FACTOR, y * (SCALING_FACTOR))
     end
     -- end
     love.graphics.setColor(1,1,1,1)
     love.graphics.draw(canvas, canvasTransform)
     love.graphics.setCanvas()  
 
+    --! Final Render Pass
+
     if showFinalGraphic then
         love.graphics.setShader(shader)
-        love.graphics.draw(finalCanvas, finalCanvasTransform)
+        love.graphics.draw(finalCanvas)
         love.graphics.setShader()
     else
-        love.graphics.draw(finalCanvas, finalCanvasTransform)
+        love.graphics.draw(finalCanvas)
         -- love.graphics.print(mpx .. ", " .. mpy, 10, 10)
     end
     
+
+    --! showing the color selector.
     if AdjustingColor then
         suit.draw();
         love.graphics.setColor(currentColor.r, currentColor.g, currentColor.b, 1)
@@ -356,6 +268,10 @@ function love.draw()
         
     end
 end
+
+--!-------------------------------------------------------------------
+--!                      INPUT HANDLING
+--!-------------------------------------------------------------------
 
 function love.keypressed(key, scancode, isrepeat)
     if(key == "backspace") then
@@ -390,20 +306,18 @@ function love.keypressed(key, scancode, isrepeat)
         return;
     end
     if(key == "4") then
-        CurrentTool = Tools.COLOR_PICKER
+        CurrentTool = Tools_PICKER
         print("current tool set to color picker")
         return;
     end
 
     if(key == "c") then
         print("screenshot taken!")
-        love.graphics.captureScreenshot("/Screenshot"..os.time()..".png")
+        ssName = "/Screenshot"..os.time()  .. ".png"
+        love.graphics.captureScreenshot(ssName)
+        -- os.rename("%appdata%/LOVE/screenshots".. ssName, "D:/LUA/Screenshots" .. ssName )
     end
     if(key == "space") then
         started = true
     end
-end
-
-function math.round(n)
-    return math.floor(n + 0.5)
 end
