@@ -1,16 +1,28 @@
 suit = require 'vendors/suit'
 
 --! TOOLS
-PENCIL = 0
-ERASER = 1
-BUCKET = 2
-COLOR_PICKER = 3
+Tools = {
+    PENCIL = 0,
+    ERASER = 1,
+    BUCKET = 2,
+    COLOR_PICKER = 3
 
-CurrentTool = PENCIL
+}
+
+CurrentTool = Tools.PENCIL
+
+--!fonts
+
 
 local pencilArea = 1
 local eraserArea = 1
-local pixelArray = {}
+local pixelArray = {
+    x,
+    y,
+    r,
+    g,
+    b
+}
 local pixelScale = 10
 local showFinalGraphic = false
 local screenshotCanvas
@@ -25,6 +37,8 @@ local labelB = ""
 local AdjustingColor = false
 local mousePos = {}
 
+local started = false
+
 function pixelArray:addPixel(xpos, ypos, color)
     print("modified pixel at ".. xpos .. ", ".. ypos.. ", ".. color.r .. ", ".. color.g .. ", ".. color.b)
     self[#self+1] = {
@@ -36,10 +50,10 @@ function pixelArray:addPixel(xpos, ypos, color)
     }
 end
 
-function pixelArray:copyPixel(x,y)
+function pixelArray:copyPixel(xpos,ypos)
     pixel = {
-        x = pixelArray:getPixelAt(x,y).x,
-        y = pixelArray:getPixelAt(x,y).y,
+        x = xpos,
+        y = ypos,
         r = pixelArray:getPixelAt(x,y).r,
         g = pixelArray:getPixelAt(x,y).g,
         b = pixelArray:getPixelAt(x,y).b
@@ -102,14 +116,14 @@ function pixelArray:getPixelAt(x,y)
     return pixelArray[pixelArray:getIndexAt(x,y)]
 end
 
-function pixelArray:matchColor(pixel, other)
-    if(pixel.r ~= other.r) then
+function pixelArray:matchColor(index, otherIndex)
+    if(self[index].r ~= self[otherIndex].r) then
         return false
     end
-    if(pixel.g ~= other.g) then
+    if(self[index].g ~= self[otherIndex].g) then
         return false
     end
-    if(pixel.b ~= other.b) then
+    if(self[index].b ~= self[otherIndex].b) then
         return false
     end
     return true
@@ -139,21 +153,25 @@ end
 function floodFill(x,y)
     -- TODO implement this
     print("TO BE IMPLEMENTED")
-    startingPixel = pixelArray:copyPixel(x,y)
+    startingPixel = pixelArray:getIndexAt(x,y)
 
-    if(pixelArray:matchColor(startingPixel, pixelArray:copyPixel(x+1,y))) then
+    print(x,y)  
+    print(startingPixel)
+    print(pixelArray:getIndexAt(x+1, y))
+
+    if(pixelArray:matchColor(startingPixel, pixelArray:getIndexAt(x+1,y))) then
         drawPixel(x + 1, y, {0,1,0,1}) -- this is debug
     end
 
-    if(pixelArray:matchColor(startingPixel, pixelArray:copyPixel(x-1,y))) then
+    if(pixelArray:matchColor(startingPixel, pixelArray:getIndexAt(x-1,y))) then
         drawPixel(x - 1, y, {0,1,0,1})
     end
 
-    if(pixelArray:matchColor(startingPixel, pixelArray:copyPixel(x,y+1))) then
+    if(pixelArray:matchColor(startingPixel, pixelArray:getIndexAt(x,y+1))) then
         drawPixel(x, y-1, {0,1,0,1})
     end
 
-    if(pixelArray:matchColor(startingPixel, pixelArray:copyPixel(x,y-1))) then
+    if(pixelArray:matchColor(startingPixel, pixelArray:getIndexAt(x,y-1))) then
         drawPixel(x, y+1, {0,1,0,1})
     end
 
@@ -184,6 +202,12 @@ function love.load()
 end
 
 function love.update(dt)
+
+    if(started == false) then
+        love.graphics.setColor(math.random(0,255)/255.0,math.random(0,255)/255.0,math.random(0,255)/255.0,1)
+        return;
+    end
+        love.graphics.setColor(1,1,1,1)
 
     --!Setting up UI
     rows1 = suit.layout:rows{
@@ -230,13 +254,13 @@ function love.update(dt)
 
         --! picking tool
         if(love.mouse.isDown(1)) then
-            if(CurrentTool == PENCIL) then
+            if(CurrentTool == Tools.PENCIL) then
                drawPixel(mpx,mpy, currentColor) 
-            elseif (CurrentTool == ERASER) then
+            elseif (CurrentTool == Tools.ERASER) then
                 erasePixel(mpx,mpy)
-            elseif (CurrentTool == BUCKET) then
+            elseif (CurrentTool == Tools.BUCKET) then
                 floodFill(mpx,mpy)
-            elseif (CurrentTool == COLOR_PICKER) then
+            elseif (CurrentTool == Tools.COLOR_PICKER) then
                 pickColor(mpx,mpy)
             else 
                 print("NO TOOL SELECTED!!!")
@@ -278,6 +302,15 @@ end
 
 function love.draw()
     
+    if(started == false) then
+        love.graphics.print("Welcome to Lua Paint!", 40, 40,0, 4)
+        love.graphics.print("this is my first project in Lua and Love2D,\nhere are some shortcuts you might wanna know.", 40, 120,0,1.5)
+        love.graphics.print("press 1 to use pencil.\nPress 2 to use eraser (you can also use right click).\nPress 3 to use bucket tool (not yet implemented). \nPress 4 to use color picker.(you can also use middle click)\nPress I to open the color slider.\nPress Enter to apply Shaders.\nPress C to take save your drawing.", 40, 200,0,1.5)
+        
+        love.graphics.print("PRESS SPACE TO CONTINUE", 40, 700, 0, 4.3)
+        return
+    end
+
     love.graphics.setCanvas(finalCanvas)
     love.graphics.clear()--clear display
     love.graphics.setBackgroundColor(.01,.01,.15,1)
@@ -314,6 +347,13 @@ function love.draw()
         love.graphics.setColor(currentColor.r, currentColor.g, currentColor.b, 1)
         love.graphics.circle("fill", 110, 210, 100, 40)
         love.graphics.setColor(1,1,1,1)
+    else
+        for key, value in pairs(Tools) do
+            if(value == CurrentTool) then
+                love.graphics.print("Current Tool: " .. key, 20, 20, 0, 1.5)
+            end
+        end
+        
     end
 end
 
@@ -335,22 +375,22 @@ function love.keypressed(key, scancode, isrepeat)
         return;
     end
     if(key == "1") then
-        CurrentTool = PENCIL
+        CurrentTool = Tools.PENCIL
         print("current tool set to pencil")
         return;
     end
     if(key == "2") then
-       CurrentTool = ERASER 
+       CurrentTool = Tools.ERASER 
        print("current tool set to eraser")
        return;
     end
     if(key == "3") then
-        CurrentTool = BUCKET
+        CurrentTool = Tools.BUCKET
         print("current tool set to bucket")
         return;
     end
     if(key == "4") then
-        CurrentTool = COLOR_PICKER
+        CurrentTool = Tools.COLOR_PICKER
         print("current tool set to color picker")
         return;
     end
@@ -359,7 +399,9 @@ function love.keypressed(key, scancode, isrepeat)
         print("screenshot taken!")
         love.graphics.captureScreenshot("/Screenshot"..os.time()..".png")
     end
-    
+    if(key == "space") then
+        started = true
+    end
 end
 
 function math.round(n)
