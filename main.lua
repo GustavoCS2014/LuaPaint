@@ -36,6 +36,7 @@ local labelB = ""
 local showFinalGraphic = false
 local AdjustingColor = false
 local started = false
+local inputEnabled = true
 
 local mousePos = {}
 
@@ -56,12 +57,60 @@ function drawPixel(x, y, color)
 end
 
 function erasePixel(x,y)
-    drawPixel(x,y, Color.defaultValue)
+    drawPixel(x,y, Blank)
 end
 
 function floodFill(x,y)
     -- TODO implement this
-    print("TO BE IMPLEMENTED")
+    
+    if(x >= WIDTH or x < 0) then return end
+    if(y >= HEIGHT or y < 0) then return end
+    
+    print("bucketing " .. x .. ", " .. y .. ", " .. logColor(CanvasData[x][y]))
+
+    local originalColor = {r,g,b,a}
+    local targetColor = {r,g,b,a}
+    copyColor(originalColor, CanvasData[x][y])
+    copyColor(targetColor, currentColor)
+
+    if(matchColor(targetColor, CanvasData[x][y])) then
+        return
+    end
+
+    drawPixel(x,y,currentColor)
+
+    local down = {x = x, y = y+1}
+    local up = {x = x, y = y-1}
+    local left = {x = x-1, y = y}
+    local right = {x = x+1,y = y}
+
+    print("R = " .. right.x .. ", " .. right.y.. "\n".."L = " .. left.x .. ", " .. left.y.. "\n".."U = " .. up.x .. ", " .. up.y.. "\n".."D = " .. down.x .. ", " .. down.y)
+
+    if(right.x < WIDTH) then 
+        if matchColor(originalColor,CanvasData[right.x][right.y]) then
+            floodFill(x+1, y)
+        end
+     end
+    if(left.x >= 0) then 
+        if matchColor(originalColor,CanvasData[left.x][left.y]) then
+            floodFill(x-1, y)
+        end
+     end
+    if(down.y < HEIGHT) then 
+        if matchColor(originalColor,CanvasData[down.x][down.y]) then
+            floodFill(x, y+1)
+        end
+     end
+    if(up.y >= 0) then 
+        if matchColor(originalColor,CanvasData[up.x][up.y]) then
+            floodFill(x, y-1)
+        end
+     end
+
+    
+    
+    
+
 
 end
 
@@ -149,22 +198,24 @@ function love.update(dt)
         
     else
         
-
-        --! picking tool
-        if(love.mouse.isDown(1)) then
-            if(CurrentTool == Tools.PENCIL) then
-                -- CanvasData:setPixel(mpx,mpy, currentColor)
-               drawPixel(mpx,mpy, currentColor)
-            elseif (CurrentTool == Tools.ERASER) then
-                erasePixel(mpx,mpy)
-            elseif (CurrentTool == Tools.BUCKET) then
-                floodFill(mpx,mpy)
-            elseif (CurrentTool == Tools_PICKER) then
-                pickColor(mpx,mpy)
-            else 
-                print("NO TOOL SELECTED!!!")
+        --! While mouse Pressed
+        if(inputEnabled) then
+            if(love.mouse.isDown(1) and CurrentTool ~= Tools.BUCKET) then
+                if(CurrentTool == Tools.PENCIL) then
+                    -- CanvasData:setPixel(mpx,mpy, currentColor)
+                   drawPixel(mpx,mpy, currentColor)
+                elseif (CurrentTool == Tools.ERASER) then
+                    erasePixel(mpx,mpy)
+                elseif (CurrentTool == Tools.BUCKET) then
+                    return
+                elseif (CurrentTool == Tools.PICKER) then
+                    pickColor(mpx,mpy)
+                else 
+                    print("NO TOOL SELECTED!!!")
+                end
             end
         end
+
     
         --!Erase shortcut
         if(love.mouse.isDown(2)) then
@@ -180,8 +231,8 @@ function love.update(dt)
         canvas:renderTo(function()
             love.graphics.clear()
 
-            for x = 1, WIDTH do
-                for y = 1, HEIGHT do
+            for x = 0, WIDTH do
+                for y = 0, HEIGHT do
                     CanvasData:drawPixelRectangle(x,y)  
                 end
             end
@@ -203,7 +254,11 @@ end
 --!-------------------------------------------------------------------
 
 function love.draw()
-    
+    if(AdjustingColor or not started) then
+        inputEnabled = false
+    else
+         inputEnabled = true
+    end
 
     --! Starting Screen
     if(started == false) then
@@ -272,6 +327,13 @@ end
 --!-------------------------------------------------------------------
 --!                      INPUT HANDLING
 --!-------------------------------------------------------------------
+
+function love.mousepressed(x, y, button, isTouch, presses)
+    if (not inputEnabled) then return end
+    if(CurrentTool == Tools.BUCKET) then
+        floodFill(mpx,mpy)
+    end
+end
 
 function love.keypressed(key, scancode, isrepeat)
     if(key == "backspace") then

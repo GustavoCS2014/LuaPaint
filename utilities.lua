@@ -1,10 +1,48 @@
 
+--! Basic Colors
 
-function copyColor(color, color)
-    color.r = color.r
-    color.g = color.g
-    color.b = color.b
-    color.a = color.a
+Red = {
+    r = 1,
+    g = 0,
+    b = 0,
+    a = 1
+}
+Green = {
+    r = 0,
+    g = 1,
+    b = 0,
+    a = 1
+}
+Blue = {
+    r = 0,
+    g = 0,
+    b = 1,
+    a = 1
+}
+White = {
+    r = 1,
+    g = 1,
+    b = 1,
+    a = 1
+}
+Black = {
+    r = 0,
+    g = 0,
+    b = 0,
+    a = 1
+}
+Blank = {
+    r = 0,
+    g = 0,
+    b = 0,
+    a = 0
+}
+
+function copyColor(color, copy)
+    color.r = copy.r
+    color.g = copy.g
+    color.b = copy.b
+    color.a = copy.a
 end
 
 function matchColor(color, other)
@@ -25,6 +63,10 @@ end
 
 function getColor(color)
     return {color.r, color.g, color.b, color.a}
+end
+
+function logColor(color)
+    return "(R = " .. color.r .. ", G = " .. color.g .. ", B = " .. color.b .. ", A = ".. color.a .. ")"
 end
 
 
@@ -65,6 +107,7 @@ PixelMap = {
     end,
 
     matchPixel = function(self, x1,y1, x2, y2)
+        print(matchColor(self[x1][y1], self[x2][y2]))
         return matchColor(self[x1][y1], self[x2][y2])
     end,
     
