@@ -5,7 +5,6 @@ WIDTH = 80
 HEIGHT = 50
 --! MUST BE INT, PREFERABLE DIVISIBLE BY 2
 SCALING_FACTOR = 10
-CanvasData = PixelMap.NewMap(WIDTH,HEIGHT)
 
 --! TOOLS
 Tools = {
@@ -42,22 +41,21 @@ local mousePos = {}
 
 
 
-
-
 function pickColor(x, y)
-    currentColor = CanvasData:pickColor(x,y)
+    currentColor = getColor(CanvasData, x, y)
 end
 
-function drawPixel(x, y, color)
-    if(matchColor(CanvasData[x][y], color)) then
-        print("same color at: " .. x .. ", " .. y.. ", " .. color.r.. ", " .. color.g.. ", " .. color.b.. ", " .. color.a)
+function draw(x, y, color)
+    -- CanvasData:setPixel(x,y,1,1,1,1)
+    if(matchColor(getColor(CanvasData,x,y), color)) then
+        print("same color at: " .. x .. ", " .. y.. ", " .. logColor(color))
        return 
     end
-    CanvasData:addPixel(x,y,color)
+    drawPixel(CanvasData,x,y,color)
 end
 
 function erasePixel(x,y)
-    drawPixel(x,y, Blank)
+    removePixel(CanvasData,x,y)
 end
 
 function floodFill(x,y)
@@ -65,19 +63,19 @@ function floodFill(x,y)
     
     if(x >= WIDTH or x < 0) then return end
     if(y >= HEIGHT or y < 0) then return end
-    
-    print("bucketing " .. x .. ", " .. y .. ", " .. logColor(CanvasData[x][y]))
-
     local originalColor = {r,g,b,a}
     local targetColor = {r,g,b,a}
-    copyColor(originalColor, CanvasData[x][y])
+    
+    copyColor(originalColor, getColor(CanvasData,x,y))
+    print("bucketing " .. x .. ", " .. y .. ", " .. logColor(originalColor))
+
     copyColor(targetColor, currentColor)
 
-    if(matchColor(targetColor, CanvasData[x][y])) then
+    if(matchColor(targetColor, originalColor)) then
         return
     end
 
-    drawPixel(x,y,currentColor)
+    drawPixel(CanvasData, x,y,targetColor)
 
     local down = {x = x, y = y+1}
     local up = {x = x, y = y-1}
@@ -87,22 +85,22 @@ function floodFill(x,y)
     print("R = " .. right.x .. ", " .. right.y.. "\n".."L = " .. left.x .. ", " .. left.y.. "\n".."U = " .. up.x .. ", " .. up.y.. "\n".."D = " .. down.x .. ", " .. down.y)
 
     if(right.x < WIDTH) then 
-        if matchColor(originalColor,CanvasData[right.x][right.y]) then
+        if matchColor(originalColor,getColor(CanvasData,right.x, right.y)) then
             floodFill(x+1, y)
         end
      end
     if(left.x >= 0) then 
-        if matchColor(originalColor,CanvasData[left.x][left.y]) then
+        if matchColor(originalColor,getColor(CanvasData,left.x, left.y)) then
             floodFill(x-1, y)
         end
      end
     if(down.y < HEIGHT) then 
-        if matchColor(originalColor,CanvasData[down.x][down.y]) then
+        if matchColor(originalColor,getColor(CanvasData, down.x, down.y)) then
             floodFill(x, y+1)
         end
      end
     if(up.y >= 0) then 
-        if matchColor(originalColor,CanvasData[up.x][up.y]) then
+        if matchColor(originalColor,getColor(CanvasData, up.x, up.y)) then
             floodFill(x, y-1)
         end
      end
@@ -125,12 +123,13 @@ function love.load()
     love.graphics.setDefaultFilter("nearest", "nearest")
     love.filesystem.setIdentity("screenshots", false)
     
+    canvas = love.graphics.newCanvas(WIDTH, HEIGHT)
+    CanvasData = canvas:newImageData()
 
     --! Setting Canvas
     canvasTransform = love.math.newTransform()
     canvasTransform:scale(SCALING_FACTOR,SCALING_FACTOR)
-    canvas = love.graphics.newCanvas(WIDTH, HEIGHT)
-    
+
     finalCanvas = love.graphics.newCanvas(WIDTH*SCALING_FACTOR,HEIGHT*SCALING_FACTOR)
 
     screenshotCanvas = love.graphics.newCanvas(WIDTH*SCALING_FACTOR,HEIGHT*SCALING_FACTOR) 
@@ -203,7 +202,7 @@ function love.update(dt)
             if(love.mouse.isDown(1) and CurrentTool ~= Tools.BUCKET) then
                 if(CurrentTool == Tools.PENCIL) then
                     -- CanvasData:setPixel(mpx,mpy, currentColor)
-                   drawPixel(mpx,mpy, currentColor)
+                   draw(mpx,mpy, currentColor)
                 elseif (CurrentTool == Tools.ERASER) then
                     erasePixel(mpx,mpy)
                 elseif (CurrentTool == Tools.BUCKET) then
@@ -228,14 +227,14 @@ function love.update(dt)
         end
 
         --! Writing to the canvas.
-        canvas:renderTo(function()
-            love.graphics.clear()
+        -- canvas:renderTo(function()
+        --     love.graphics.clear()
 
-            for x = 0, WIDTH do
-                for y = 0, HEIGHT do
-                    CanvasData:drawPixelRectangle(x,y)  
-                end
-            end
+        --     for x = 0, WIDTH do
+        --         for y = 0, HEIGHT do
+        --             CanvasData:drawPixelRectangle(x,y)  
+        --         end
+        --     end
 
             -- for i = 1, #pixelArray do
             --     love.graphics.setColor(pixelArray[i].r, pixelArray[i].g, pixelArray[i].b, 1)
@@ -244,7 +243,7 @@ function love.update(dt)
             --for pixel in pixelArray do
             --    love.graphics.rectangle("fill",pixel.x, pixel.y,1, 1)
             --end
-        end)
+        -- end)
         
     end 
 end
@@ -293,7 +292,8 @@ function love.draw()
     end
     -- end
     love.graphics.setColor(1,1,1,1)
-    love.graphics.draw(canvas, canvasTransform)
+    local pixelCanvas = love.graphics.newImage(CanvasData)
+    love.graphics.draw(pixelCanvas, canvasTransform)
     love.graphics.setCanvas()  
 
     --! Final Render Pass
@@ -337,7 +337,6 @@ end
 
 function love.keypressed(key, scancode, isrepeat)
     if(key == "backspace") then
-        pixelArray:removePixel()
         return;
     end
     if(key == "escape") then
@@ -381,5 +380,9 @@ function love.keypressed(key, scancode, isrepeat)
     end
     if(key == "space") then
         started = true
+    end
+
+    if(key == "u") then
+        print("the color is " .. logColor(getColor(CanvasData, mpx, mpy)))
     end
 end
