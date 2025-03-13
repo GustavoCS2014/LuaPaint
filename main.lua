@@ -11,7 +11,7 @@ Tools = {
     PENCIL = 0,
     ERASER = 1,
     BUCKET = 2,
-    COLOR_PICKER = 3
+    PICKER = 3
 
 }
 
@@ -43,6 +43,7 @@ local mousePos = {}
 
 function pickColor(x, y)
     currentColor = getColor(CanvasData, x, y)
+    print("col: " .. logColor(currentColor))
 end
 
 function draw(x, y, color)
@@ -367,7 +368,7 @@ function love.keypressed(key, scancode, isrepeat)
         return;
     end
     if(key == "4") then
-        CurrentTool = Tools_PICKER
+        CurrentTool = Tools.PICKER
         print("current tool set to color picker")
         return;
     end
