@@ -4,7 +4,13 @@ require 'utilities'
 WIDTH = 80
 HEIGHT = 50
 --! MUST BE INT, PREFERABLE DIVISIBLE BY 2
-SCALING_FACTOR = 10
+WindowWidth = 0
+WindowHeight = 0
+WidthRatio = 0
+HeightRatio = 0
+CanvasScaling = 0
+local canvasAnchorPoint = {}
+CanvasPadding = 10
 
 --! TOOLS
 Tools = {
@@ -120,28 +126,33 @@ end
 
 function love.load()
     --! Importan Variables
-    love.window.setMode(WIDTH*SCALING_FACTOR, HEIGHT*SCALING_FACTOR)
+    love.window.setMode(1080, 720, {resizable = true})
     love.graphics.setDefaultFilter("nearest", "nearest")
     love.filesystem.setIdentity("screenshots", false)
     
+
     canvas = love.graphics.newCanvas(WIDTH, HEIGHT)
     CanvasData = canvas:newImageData()
 
+    
     --! Setting Canvas
-    canvasTransform = love.math.newTransform()
-    canvasTransform:scale(SCALING_FACTOR,SCALING_FACTOR)
+    CanvasTransform = love.math.newTransform()
+    CanvasTransform:scale(1,1)
+    
+    finalCanvas = love.graphics.newCanvas()
 
-    finalCanvas = love.graphics.newCanvas(WIDTH*SCALING_FACTOR,HEIGHT*SCALING_FACTOR)
-
-    screenshotCanvas = love.graphics.newCanvas(WIDTH*SCALING_FACTOR,HEIGHT*SCALING_FACTOR) 
+    screenshotCanvas = love.graphics.newCanvas(WIDTH,HEIGHT) 
 
     --! Shaders
     local fragdir = love.filesystem.read('shader.frag')
     shader = love.graphics.newShader(fragdir)
     
     --send data to GPU
-    shader:send('inputSize', {WIDTH*SCALING_FACTOR, HEIGHT*SCALING_FACTOR})
-    shader:send('textureSize', {WIDTH*SCALING_FACTOR, HEIGHT*SCALING_FACTOR})
+    shader:send('inputSize', {WIDTH, HEIGHT})
+    shader:send('textureSize', {WIDTH, HEIGHT})
+
+    
+    love.resize(1080, 720)
 end
 
 --!-------------------------------------------------------------------
@@ -174,8 +185,9 @@ function love.update(dt)
 
     --! Getting mouse pos
     mousePos.x, mousePos.y = love.mouse.getPosition()
-    mpx = math.floor(mousePos.x/(SCALING_FACTOR) )
-    mpy = math.floor(mousePos.y/(SCALING_FACTOR))
+    -- if(mousePos.x > )
+    mpx = math.floor((mousePos.x - canvasAnchorPoint[0])/(CanvasScaling) )
+    mpy = math.floor((mousePos.y - canvasAnchorPoint[1])/(CanvasScaling))
 
 
     --! Manual Color Picker
@@ -199,23 +211,7 @@ function love.update(dt)
     else
         
         --! While mouse Pressed
-        if(inputEnabled) then
-            if(love.mouse.isDown(1) and CurrentTool ~= Tools.BUCKET) then
-                if(CurrentTool == Tools.PENCIL) then
-                    -- CanvasData:setPixel(mpx,mpy, currentColor)
-                   draw(mpx,mpy, currentColor)
-                elseif (CurrentTool == Tools.ERASER) then
-                    erasePixel(mpx,mpy)
-                elseif (CurrentTool == Tools.BUCKET) then
-                    return
-                elseif (CurrentTool == Tools.PICKER) then
-                    pickColor(mpx,mpy)
-                else 
-                    print("NO TOOL SELECTED!!!")
-                end
-            end
-        end
-
+        HandleInput()
     
         --!Erase shortcut
         if(love.mouse.isDown(2)) then
@@ -250,10 +246,40 @@ function love.update(dt)
 end
 
 --!-------------------------------------------------------------------
+--!                   WINDOW RESIZE CALLBACK
+--!-------------------------------------------------------------------
+function love.resize(w, h)
+    --! Checking the biggest size for the canvas.
+    WindowHeight = h
+    WindowWidth = w
+    
+    WidthRatio = (WindowWidth - (CanvasPadding * 2))/WIDTH
+    HeightRatio = (WindowHeight - (CanvasPadding * 2))/HEIGHT
+    
+    CanvasScaling = math.min(WidthRatio, HeightRatio)
+    CanvasTransform:scale(CanvasScaling, CanvasScaling)
+    
+    --! getting the canvas anchor point
+    if(CanvasScaling == WidthRatio) then
+        canvasAnchorPoint[0] =  0  + CanvasPadding
+        canvasAnchorPoint[1] = WindowHeight - CanvasPadding - (HEIGHT*CanvasScaling) 
+    else
+         canvasAnchorPoint[0] = WindowWidth - CanvasPadding - (WIDTH*CanvasScaling) 
+         canvasAnchorPoint[1] =  0  + CanvasPadding
+    end
+
+    finalCanvas = love.graphics.newCanvas(w,h)
+end
+
+
+--!-------------------------------------------------------------------
 --!                      DRAW LOOP
 --!-------------------------------------------------------------------
 
 function love.draw()
+
+    local pixelCanvas = love.graphics.newImage(CanvasData)
+    
     if(AdjustingColor or not started) then
         inputEnabled = false
     else
@@ -273,8 +299,9 @@ function love.draw()
     --! First Render pass
     love.graphics.setCanvas(finalCanvas)
     love.graphics.clear()--clear display
-    love.graphics.setBackgroundColor(.01,.01,.15,1)
-    
+    love.graphics.setBackgroundColor(0.286, 0.31, 0.31,1)
+    love.graphics.setColor(.49,.51,.51,1)
+    love.graphics.rectangle("fill",canvasAnchorPoint[0], canvasAnchorPoint[1],WIDTH * CanvasScaling,HEIGHT * CanvasScaling)
     --draw any stuff here
     
     if(showFinalGraphic) then
@@ -283,18 +310,24 @@ function love.draw()
         love.graphics.setColor(1,1,1,.5)
     end
     
+
+    
+
     -- if not showFinalGraphic then
     for x = 1, WIDTH do
-        love.graphics.line(x * (SCALING_FACTOR), 0, x * (SCALING_FACTOR), HEIGHT*SCALING_FACTOR)
+        love.graphics.line(canvasAnchorPoint[0] + x * (CanvasScaling),canvasAnchorPoint[1] + 0,canvasAnchorPoint[0] +  x * (CanvasScaling), canvasAnchorPoint[1] + HEIGHT*CanvasScaling)
     end
 
     for y = 1, HEIGHT do
-        love.graphics.line(0,y * (SCALING_FACTOR), WIDTH*SCALING_FACTOR, y * (SCALING_FACTOR))
+        love.graphics.line(canvasAnchorPoint[0] + 0,canvasAnchorPoint[1] + y * (CanvasScaling),canvasAnchorPoint[0] +  WIDTH*CanvasScaling,canvasAnchorPoint[1] + y * (CanvasScaling))
     end
-    -- end
+
     love.graphics.setColor(1,1,1,1)
-    local pixelCanvas = love.graphics.newImage(CanvasData)
-    love.graphics.draw(pixelCanvas, canvasTransform)
+
+    print("x " .. canvasAnchorPoint[0] .. " ,y " .. canvasAnchorPoint[1])
+    love.graphics.draw(pixelCanvas, canvasAnchorPoint[0], canvasAnchorPoint[1], 0, CanvasScaling)        
+    -- love.graphics.draw(pixelCanvas, 0,0, 0, CanvasScaling)
+
     love.graphics.setCanvas()  
 
     --! Final Render Pass
@@ -323,11 +356,38 @@ function love.draw()
         end
         
     end
+    
+    love.graphics.setColor(1, 1, 1, 1)
+    -- love.graphics.print("aspect: " .. CanvasScaling, 20, 50, 0, 1.5)
+    love.graphics.print("mpx: " .. mpx .. "mpy: " .. mpy, 20, 50, 0, 1.5)
+    -- love.graphics.setColor(1,0,0,0.5)
+    -- love.graphics.rectangle("fill", 0, 0, WIDTH*CanvasScaling,  HEIGHT*CanvasScaling)
+
 end
 
 --!-------------------------------------------------------------------
 --!                      INPUT HANDLING
 --!-------------------------------------------------------------------
+
+function HandleInput()
+    if(inputEnabled) then
+        if(love.mouse.isDown(1) and CurrentTool ~= Tools.BUCKET) then
+            if(mpx < 0 or mpx > WIDTH or mpy < 0 or mpy >HEIGHT) then return end
+            if(CurrentTool == Tools.PENCIL) then
+                -- CanvasData:setPixel(mpx,mpy, currentColor)
+               draw(mpx,mpy, currentColor)
+            elseif (CurrentTool == Tools.ERASER) then
+                erasePixel(mpx,mpy)
+            elseif (CurrentTool == Tools.BUCKET) then
+                return
+            elseif (CurrentTool == Tools.PICKER) then
+                pickColor(mpx,mpy)
+            else 
+                print("NO TOOL SELECTED!!!")
+            end
+        end
+    end
+end
 
 function love.mousepressed(x, y, button, isTouch, presses)
     if (not inputEnabled) then return end
